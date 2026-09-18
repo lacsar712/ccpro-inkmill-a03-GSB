@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '../lib/api';
+  import { unackedAlarmCount, refreshUnackedCount } from '../lib/alarms';
+  import { page } from '../lib/nav';
   import type { DashboardStats } from '../lib/types';
 
   let data: DashboardStats | null = null;
@@ -9,7 +11,10 @@
 
   onMount(async () => {
     try {
-      data = await api<DashboardStats>('/dashboard');
+      [data] = await Promise.all([
+        api<DashboardStats>('/dashboard'),
+        refreshUnackedCount(),
+      ]);
     } catch (e) {
       error = e instanceof Error ? e.message : '加载失败';
     } finally {
@@ -46,6 +51,17 @@
       <div class="v">{data.passesLast7d}</div>
     </article>
   </div>
+
+  <section class="alarm-bar">
+    <div>
+      <span class="alarm-k">未确认粘度告警</span>
+      <span class="alarm-v" class:hot={$unackedAlarmCount > 0}>{$unackedAlarmCount}</span>
+      <span class="muted">条</span>
+    </div>
+    {#if $unackedAlarmCount > 0}
+      <button class="btn-primary" on:click={() => page.set('alarm-events')}>前往处理</button>
+    {/if}
+  </section>
 {/if}
 
 <style>
@@ -83,6 +99,34 @@
   }
 
   .accent {
+    color: var(--vermillion-400);
+  }
+
+  .alarm-bar {
+    margin-top: 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 1.1rem;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--vermillion-700);
+  }
+
+  .alarm-k {
+    color: var(--steel);
+    font-size: 0.9rem;
+    margin-right: 0.75rem;
+  }
+
+  .alarm-v {
+    font-family: var(--font-display);
+    font-size: 1.8rem;
+    margin-right: 0.35rem;
+  }
+
+  .alarm-v.hot {
     color: var(--vermillion-400);
   }
 

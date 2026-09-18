@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from app.alarm_service import evaluate_sample
 from app.auth import hash_password
 from app.database import SessionLocal
 from app.models.grind_pass import GrindPass
 from app.models.mill import Mill
 from app.models.user import User
+from app.models.viscosity_alarm_rule import ViscosityAlarmRule
 from app.models.viscosity_sample import ViscositySample
 from app.models.workshop import Workshop
 
@@ -58,30 +60,72 @@ def seed() -> None:
             db.add_all([m1, m2, m3])
             db.flush()
 
+            # M-01 粘度告警规则：合格区间 10 ~ 14 Pa·s（宽度 4，半宽 2）
+            rule_m1 = ViscosityAlarmRule(
+                mill_id=m1.id,
+                min_pa_s=Decimal("10.0000"),
+                max_pa_s=Decimal("14.0000"),
+                active=True,
+            )
+            db.add(rule_m1)
+            db.flush()
+
             now = datetime.now()
+            samples = [
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(hours=5),
+                    viscosity_pa_s=Decimal("16.5000"),
+                    temp_c=Decimal("31.20"),
+                    notes="早班超粘，已处理确认",
+                ),
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(hours=2),
+                    viscosity_pa_s=Decimal("12.5000"),
+                    temp_c=Decimal("28.50"),
+                    notes="首检合格",
+                ),
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(minutes=30),
+                    viscosity_pa_s=Decimal("9.8000"),
+                    temp_c=Decimal("29.00"),
+                    notes="二检微调，略低于下限",
+                ),
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(minutes=10),
+                    viscosity_pa_s=Decimal("4.5000"),
+                    temp_c=Decimal("29.40"),
+                    notes="稀释过度，严重偏低",
+                ),
+                ViscositySample(
+                    mill_id=m2.id,
+                    sampled_at=now - timedelta(days=1),
+                    viscosity_pa_s=Decimal("15.2000"),
+                    temp_c=Decimal("27.00"),
+                    notes=None,
+                ),
+            ]
+            db.add_all(samples)
+            db.flush()
+
+            # 按规则自动判定告警：
+            # 16.5 → critical（超限 2.5 > 半宽 2，已确认）
+            # 9.8  → warn（超限 0.2，未确认）
+            # 4.5  → critical（超限 5.5 > 半宽 2，未确认）
+            events = []
+            for sample in samples:
+                events.extend(evaluate_sample(db, sample))
+            db.add_all(events)
+            db.flush()
+            for event in events:
+                if event.triggered_at <= now - timedelta(hours=4):
+                    event.acked = True
+
             db.add_all(
                 [
-                    ViscositySample(
-                        mill_id=m1.id,
-                        sampled_at=now - timedelta(hours=2),
-                        viscosity_pa_s=Decimal("12.5000"),
-                        temp_c=Decimal("28.50"),
-                        notes="首检合格",
-                    ),
-                    ViscositySample(
-                        mill_id=m1.id,
-                        sampled_at=now - timedelta(minutes=30),
-                        viscosity_pa_s=Decimal("9.8000"),
-                        temp_c=Decimal("29.00"),
-                        notes="二检微调",
-                    ),
-                    ViscositySample(
-                        mill_id=m2.id,
-                        sampled_at=now - timedelta(days=1),
-                        viscosity_pa_s=Decimal("15.2000"),
-                        temp_c=Decimal("27.00"),
-                        notes=None,
-                    ),
                     GrindPass(
                         mill_id=m1.id,
                         started_at=now - timedelta(hours=3),

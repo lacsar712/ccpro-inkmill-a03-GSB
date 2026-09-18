@@ -1,27 +1,46 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { token, user, clearSession } from './lib/auth';
+  import { page, type PageId } from './lib/nav';
+  import { unackedAlarmCount, refreshUnackedCount } from './lib/alarms';
   import Login from './routes/Login.svelte';
   import Dashboard from './routes/Dashboard.svelte';
   import Workshops from './routes/Workshops.svelte';
   import Mills from './routes/Mills.svelte';
   import ViscositySamples from './routes/ViscositySamples.svelte';
   import GrindPasses from './routes/GrindPasses.svelte';
+  import AlarmRules from './routes/AlarmRules.svelte';
+  import AlarmEvents from './routes/AlarmEvents.svelte';
 
-  type PageId = 'dashboard' | 'workshops' | 'mills' | 'samples' | 'passes';
+  type NavItem = { id: PageId; label: string; alarm?: boolean };
 
-  let page: PageId = 'dashboard';
-
-  const nav: { id: PageId; label: string }[] = [
+  const nav: NavItem[] = [
     { id: 'dashboard', label: '仪表盘' },
     { id: 'workshops', label: '车间' },
     { id: 'mills', label: '研磨机' },
     { id: 'samples', label: '粘度取样' },
     { id: 'passes', label: '研磨遍次' },
+    { id: 'alarm-rules', label: '告警规则' },
+    { id: 'alarm-events', label: '告警事件', alarm: true },
   ];
+
+  let timer: ReturnType<typeof setInterval> | undefined;
+
+  onMount(() => {
+    refreshUnackedCount();
+    timer = setInterval(refreshUnackedCount, 30000);
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  });
 
   function logout() {
     clearSession();
-    page = 'dashboard';
+    page.set('dashboard');
+  }
+
+  $: if (!$token && timer) {
+    clearInterval(timer);
   }
 </script>
 
@@ -39,8 +58,11 @@
       </div>
       <nav>
         {#each nav as item}
-          <button class:active={page === item.id} on:click={() => (page = item.id)}>
-            {item.label}
+          <button class:active={$page === item.id} on:click={() => page.set(item.id)}>
+            <span>{item.label}</span>
+            {#if item.alarm && $unackedAlarmCount > 0}
+              <span class="count">{$unackedAlarmCount}</span>
+            {/if}
           </button>
         {/each}
       </nav>
@@ -51,16 +73,20 @@
       </div>
     </aside>
     <main class="main">
-      {#if page === 'dashboard'}
+      {#if $page === 'dashboard'}
         <Dashboard />
-      {:else if page === 'workshops'}
+      {:else if $page === 'workshops'}
         <Workshops />
-      {:else if page === 'mills'}
+      {:else if $page === 'mills'}
         <Mills />
-      {:else if page === 'samples'}
+      {:else if $page === 'samples'}
         <ViscositySamples />
-      {:else}
+      {:else if $page === 'passes'}
         <GrindPasses />
+      {:else if $page === 'alarm-rules'}
+        <AlarmRules />
+      {:else}
+        <AlarmEvents />
       {/if}
     </main>
   </div>
@@ -124,6 +150,9 @@
   }
 
   nav button {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     text-align: left;
     border: 1px solid transparent;
     background: transparent;
@@ -143,6 +172,17 @@
     background: linear-gradient(90deg, rgba(139, 37, 0, 0.35), rgba(192, 57, 43, 0.12));
     border-color: rgba(231, 76, 60, 0.45);
     color: white;
+  }
+
+  .count {
+    min-width: 1.4rem;
+    padding: 0.05rem 0.4rem;
+    text-align: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: white;
+    background: var(--vermillion-700);
+    border-radius: 8px;
   }
 
   .side-foot {

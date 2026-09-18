@@ -34,7 +34,28 @@ MySQL 连接：`inkmill` / `inkmill` / `inkmill`（库名/用户/密码）
 2. **Mill**：`workshopId`, `millCode`（同车间唯一）, `pigmentBase`, `bowlLiters`, `status`（`grinding` \| `idle` \| `wash`）
 3. **ViscositySample**：`millId`, `sampledAt`, `viscosityPaS`（须 &gt; 0，否则 HTTP 400）, `tempC`, `notes`
 4. **GrindPass**：`millId`, `startedAt`, `passNo`（≥ 1）, `durationMin`（&gt; 0）, `mediaType`, `operatorName`
-5. **Dashboard**：`workshopTotal`, `grindingMillCount`, `samplesLast24h`, `passesLast7d`
+5. **ViscosityAlarmRule**（挂 Mill）：`millId`, `minPaS`, `maxPaS`（min 必须 &lt; max）, `active`
+6. **ViscosityAlarmEvent**：`ruleId`, `sampleId`, `triggeredAt`, `level`（`warn` \| `critical`）, `message`, `acked`
+7. **Dashboard**：`workshopTotal`, `grindingMillCount`, `samplesLast24h`, `passesLast7d`, `unackedAlarmCount`
+
+### 粘度告警机制
+
+- 规则挂在研磨机上，定义合格粘度区间 `[minPaS, maxPaS]`，仅 `active=true` 的规则参与判定。
+- **新建** ViscositySample 后，后端自动查找该机台 active 规则：粘度落在区间外则为每条越界规则生成一条告警事件（取样接口响应本身仍返回取样记录）。
+- 级别：越界量超过区间宽度一半（`超限 > (max-min)/2`）为 `critical`，否则为 `warn`；恰好等于半宽按 `warn` 计。
+- 事件只能由后端判定生成，前端不做任何本地假告警。
+- 种子数据含 1 条规则（M-01，10～14 Pa·s）与 3 条事件（1 条已确认、2 条未确认，涵盖 warn 与 critical）。
+
+### 告警 API
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET/POST | `/api/viscosity-alarm-rules` | 规则列表（可带 `?millId=`）/ 新建规则 |
+| PUT/DELETE | `/api/viscosity-alarm-rules/{id}` | 修改 / 删除规则（删除级联清理事件） |
+| GET | `/api/viscosity-alarm-events` | 事件列表，可按 `?millId=`、`?acked=true\|false`、`?level=warn\|critical` 筛选 |
+| POST | `/api/viscosity-alarm-events/{id}/ack` | 确认告警（幂等，置 `acked=true`） |
+
+前端侧栏含「告警规则」「告警事件」两个入口；侧栏角标、仪表盘与粘度取样页均展示**未确认告警条数**（取自后端）。
 
 ## 快速启动（Docker）
 
@@ -96,11 +117,12 @@ InkMill-01/
 │   ├── entrypoint.sh
 │   ├── requirements.txt
 │   ├── wsgi.py
-│   └── app/                  # Flask 路由、模型与种子数据
+│   └── app/                  # Flask 路由、模型、告警判定与种子数据
+│       └── alarm_service.py  # 取样越界 → warn/critical 事件判定
 └── frontend/
     ├── Dockerfile
     ├── vite.config.ts
-    └── src/routes/           # Login / Dashboard / CRUD 页面
+    └── src/routes/           # Login / Dashboard / CRUD / 告警规则与事件页
 ```
 
 ## UI 主题

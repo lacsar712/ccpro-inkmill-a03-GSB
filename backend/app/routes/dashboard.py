@@ -7,6 +7,7 @@ from sqlalchemy import func, select
 from app.database import SessionLocal
 from app.models.grind_pass import GrindPass
 from app.models.mill import Mill
+from app.models.viscosity_alarm_event import ViscosityAlarmEvent
 from app.models.viscosity_sample import ViscositySample
 from app.models.workshop import Workshop
 
@@ -45,6 +46,14 @@ def summary():
             )
             or 0
         )
+        unacked_alarm_count = (
+            db.scalar(
+                select(func.count())
+                .select_from(ViscosityAlarmEvent)
+                .where(ViscosityAlarmEvent.acked.is_(False))
+            )
+            or 0
+        )
 
         return jsonify(
             {
@@ -52,6 +61,7 @@ def summary():
                 "grindingMillCount": grinding_mill_count,
                 "samplesLast24h": samples_last_24h,
                 "passesLast7d": passes_last_7d,
+                "unackedAlarmCount": unacked_alarm_count,
             }
         )
     finally:

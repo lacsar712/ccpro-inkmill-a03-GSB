@@ -44,9 +44,32 @@ export interface GrindPass {
   operatorName: string;
 }
 
+export interface ViscosityAlarmRule {
+  id: number;
+  millId: number;
+  minPaS: number;
+  maxPaS: number;
+  active: boolean;
+}
+
+export type AlarmLevel = 'warn' | 'critical';
+
+export interface ViscosityAlarmEvent {
+  id: number;
+  ruleId: number;
+  sampleId: number;
+  millId: number | null;
+  triggeredAt: string;
+  level: AlarmLevel;
+  message: string;
+  acked: boolean;
+  viscosityPaS: number | null;
+}
+
 export interface DashboardStats {
   workshopTotal: number;
   grindingMillCount: number;
   samplesLast24h: number;
   passesLast7d: number;
+  unackedAlarmCount: number;
 }

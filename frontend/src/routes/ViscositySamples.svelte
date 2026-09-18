@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '../lib/api';
+  import { refreshUnackedCount, unackedAlarmCount } from '../lib/alarms';
+  import { page } from '../lib/nav';
   import type { Mill, ViscositySample } from '../lib/types';
 
   let rows: ViscositySample[] = [];
@@ -35,7 +37,10 @@
     }
   }
 
-  onMount(load);
+  onMount(async () => {
+    await load();
+    await refreshUnackedCount();
+  });
 
   function millLabel(id: number): string {
     const m = mills.find((x) => x.id === id);
@@ -90,6 +95,7 @@
       }
       reset();
       await load();
+      await refreshUnackedCount();
     } catch (e) {
       error = e instanceof Error ? e.message : '保存失败';
     }
@@ -100,6 +106,7 @@
     try {
       await api(`/viscosity-samples/${id}`, { method: 'DELETE' });
       await load();
+      await refreshUnackedCount();
     } catch (e) {
       error = e instanceof Error ? e.message : '删除失败';
     }
@@ -110,6 +117,13 @@
   <h1>粘度取样</h1>
   <p>记录 Pa·s 粘度（必须 &gt; 0），配合温度与备注</p>
 </header>
+
+<div class="alarm-strip">
+  当前有
+  <strong class:hot={$unackedAlarmCount > 0}>{$unackedAlarmCount}</strong>
+  条未确认粘度告警
+  <button class="link-btn" on:click={() => page.set('alarm-events')}>查看告警事件 →</button>
+</div>
 
 {#if error}
   <div class="err">{error}</div>
@@ -173,3 +187,25 @@
     </tbody>
   </table>
 </section>
+
+<style>
+  .alarm-strip {
+    margin-bottom: 0.9rem;
+    padding: 0.7rem 0.9rem;
+    font-size: 0.88rem;
+    color: var(--steel);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--vermillion-700);
+  }
+
+  .alarm-strip strong {
+    margin: 0 0.25rem;
+    font-family: var(--font-display);
+    font-size: 1.05rem;
+  }
+
+  .alarm-strip strong.hot {
+    color: var(--vermillion-400);
+  }
+</style>
