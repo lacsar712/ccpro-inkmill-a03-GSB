@@ -3,6 +3,7 @@ from decimal import Decimal
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 
+from app.alarms import evaluate_sample_alarms
 from app.database import SessionLocal
 from app.models.mill import Mill
 from app.models.viscosity_sample import ViscositySample
@@ -73,6 +74,8 @@ def create_sample():
             notes=str(body.get("notes", "")).strip() or None,
         )
         db.add(row)
+        db.flush()
+        evaluate_sample_alarms(db, row)
         db.commit()
         db.refresh(row)
         return jsonify(viscosity_sample_json(row)), 201

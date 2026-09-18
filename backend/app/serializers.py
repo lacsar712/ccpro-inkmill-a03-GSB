@@ -3,6 +3,8 @@ from decimal import Decimal
 from app.models.grind_pass import GrindPass
 from app.models.mill import Mill
 from app.models.user import User
+from app.models.viscosity_alarm_event import ViscosityAlarmEvent
+from app.models.viscosity_alarm_rule import ViscosityAlarmRule
 from app.models.viscosity_sample import ViscositySample
 from app.models.workshop import Workshop
 from app.utils import dt_to_json
@@ -63,4 +65,27 @@ def grind_pass_json(row: GrindPass) -> dict:
         "durationMin": _num(row.duration_min) or 0,
         "mediaType": row.media_type,
         "operatorName": row.operator_name,
+    }
+
+
+def viscosity_alarm_rule_json(row: ViscosityAlarmRule) -> dict:
+    return {
+        "id": row.id,
+        "millId": row.mill_id,
+        "minPaS": _num(row.min_pa_s) or 0,
+        "maxPaS": _num(row.max_pa_s) or 0,
+        "active": bool(row.active),
+    }
+
+
+def viscosity_alarm_event_json(row: ViscosityAlarmEvent) -> dict:
+    return {
+        "id": row.id,
+        "ruleId": row.rule_id,
+        "sampleId": row.sample_id,
+        "millId": row.rule.mill_id if row.rule else None,
+        "triggeredAt": dt_to_json(row.triggered_at),
+        "level": row.level,
+        "message": row.message,
+        "acked": bool(row.acked),
     }

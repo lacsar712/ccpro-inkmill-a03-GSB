@@ -23,3 +23,6 @@ class ViscositySample(Base):
     )
 
     mill: Mapped["Mill"] = relationship("Mill", back_populates="viscosity_samples")
+    alarm_events: Mapped[list["ViscosityAlarmEvent"]] = relationship(
+        "ViscosityAlarmEvent", back_populates="sample"
+    )

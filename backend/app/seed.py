@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta
 from decimal import Decimal
 
+from app.alarms import evaluate_sample_alarms
 from app.auth import hash_password
 from app.database import SessionLocal
 from app.models.grind_pass import GrindPass
 from app.models.mill import Mill
 from app.models.user import User
+from app.models.viscosity_alarm_rule import ViscosityAlarmRule
 from app.models.viscosity_sample import ViscositySample
 from app.models.workshop import Workshop
 
@@ -59,29 +61,46 @@ def seed() -> None:
             db.flush()
 
             now = datetime.now()
+            samples = [
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(hours=2),
+                    viscosity_pa_s=Decimal("12.5000"),
+                    temp_c=Decimal("28.50"),
+                    notes="首检合格",
+                ),
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(minutes=30),
+                    viscosity_pa_s=Decimal("9.8000"),
+                    temp_c=Decimal("29.00"),
+                    notes="二检微调",
+                ),
+                ViscositySample(
+                    mill_id=m2.id,
+                    sampled_at=now - timedelta(days=1),
+                    viscosity_pa_s=Decimal("15.2000"),
+                    temp_c=Decimal("27.00"),
+                    notes=None,
+                ),
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(minutes=20),
+                    viscosity_pa_s=Decimal("15.5000"),
+                    temp_c=Decimal("30.10"),
+                    notes="粘度偏高复检",
+                ),
+                ViscositySample(
+                    mill_id=m1.id,
+                    sampled_at=now - timedelta(minutes=10),
+                    viscosity_pa_s=Decimal("17.8000"),
+                    temp_c=Decimal("31.00"),
+                    notes="严重超上限，待处理",
+                ),
+            ]
             db.add_all(
-                [
-                    ViscositySample(
-                        mill_id=m1.id,
-                        sampled_at=now - timedelta(hours=2),
-                        viscosity_pa_s=Decimal("12.5000"),
-                        temp_c=Decimal("28.50"),
-                        notes="首检合格",
-                    ),
-                    ViscositySample(
-                        mill_id=m1.id,
-                        sampled_at=now - timedelta(minutes=30),
-                        viscosity_pa_s=Decimal("9.8000"),
-                        temp_c=Decimal("29.00"),
-                        notes="二检微调",
-                    ),
-                    ViscositySample(
-                        mill_id=m2.id,
-                        sampled_at=now - timedelta(days=1),
-                        viscosity_pa_s=Decimal("15.2000"),
-                        temp_c=Decimal("27.00"),
-                        notes=None,
-                    ),
+                samples
+                + [
                     GrindPass(
                         mill_id=m1.id,
                         started_at=now - timedelta(hours=3),
@@ -108,6 +127,21 @@ def seed() -> None:
                     ),
                 ]
             )
+
+            rule = ViscosityAlarmRule(
+                mill_id=m1.id,
+                min_pa_s=Decimal("8.0000"),
+                max_pa_s=Decimal("14.0000"),
+                active=True,
+            )
+            db.add(rule)
+            db.flush()
+
+            events = []
+            for sample in samples:
+                events.extend(evaluate_sample_alarms(db, sample))
+            if events:
+                events[0].acked = True  # 演示一条已确认，其余保持未确认
             db.commit()
             print("Seed data inserted.")
         else:

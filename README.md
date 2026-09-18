@@ -34,7 +34,17 @@ MySQL 连接：`inkmill` / `inkmill` / `inkmill`（库名/用户/密码）
 2. **Mill**：`workshopId`, `millCode`（同车间唯一）, `pigmentBase`, `bowlLiters`, `status`（`grinding` \| `idle` \| `wash`）
 3. **ViscositySample**：`millId`, `sampledAt`, `viscosityPaS`（须 &gt; 0，否则 HTTP 400）, `tempC`, `notes`
 4. **GrindPass**：`millId`, `startedAt`, `passNo`（≥ 1）, `durationMin`（&gt; 0）, `mediaType`, `operatorName`
-5. **Dashboard**：`workshopTotal`, `grindingMillCount`, `samplesLast24h`, `passesLast7d`
+5. **ViscosityAlarmRule**：`millId`, `minPaS`, `maxPaS`（须 min &lt; max，否则 HTTP 400）, `active`
+6. **ViscosityAlarmEvent**：`ruleId`, `sampleId`, `triggeredAt`, `level`（`warn` \| `critical`）, `message`, `acked`
+7. **Dashboard**：`workshopTotal`, `grindingMillCount`, `samplesLast24h`, `passesLast7d`, `unackedAlarms`
+
+## 粘度告警
+
+- 新建 `ViscositySample` 后，若该研磨机存在 `active` 规则且粘度越出 `[minPaS, maxPaS]`，自动生成 `ViscosityAlarmEvent`。
+- 越界超出区间宽度一半以上时级别为 `critical`，否则为 `warn`。
+- `GET /api/viscosity-alarm-events` 支持 `?millId=` 与 `?acked=true|false` 筛选；`POST /api/viscosity-alarm-events/<id>/ack` 确认告警。
+- 规则 CRUD：`/api/viscosity-alarm-rules`。
+- 前端侧栏「粘度告警」含规则页与事件页，仪表盘展示未确认条数。
 
 ## 快速启动（Docker）
 

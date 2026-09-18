@@ -1,13 +1,24 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { token, user, clearSession } from './lib/auth';
+  import { unackedAlarms, refreshUnackedAlarms } from './lib/alarms';
   import Login from './routes/Login.svelte';
   import Dashboard from './routes/Dashboard.svelte';
   import Workshops from './routes/Workshops.svelte';
   import Mills from './routes/Mills.svelte';
   import ViscositySamples from './routes/ViscositySamples.svelte';
   import GrindPasses from './routes/GrindPasses.svelte';
+  import AlarmRules from './routes/AlarmRules.svelte';
+  import AlarmEvents from './routes/AlarmEvents.svelte';
 
-  type PageId = 'dashboard' | 'workshops' | 'mills' | 'samples' | 'passes';
+  type PageId =
+    | 'dashboard'
+    | 'workshops'
+    | 'mills'
+    | 'samples'
+    | 'passes'
+    | 'alarm-rules'
+    | 'alarm-events';
 
   let page: PageId = 'dashboard';
 
@@ -18,6 +29,17 @@
     { id: 'samples', label: '粘度取样' },
     { id: 'passes', label: '研磨遍次' },
   ];
+
+  const alarmNav: { id: PageId; label: string }[] = [
+    { id: 'alarm-rules', label: '告警规则' },
+    { id: 'alarm-events', label: '告警事件' },
+  ];
+
+  onMount(() => {
+    if ($token) refreshUnackedAlarms();
+  });
+
+  $: if ($token && page) refreshUnackedAlarms();
 
   function logout() {
     clearSession();
@@ -43,6 +65,15 @@
             {item.label}
           </button>
         {/each}
+        <div class="nav-group">粘度告警</div>
+        {#each alarmNav as item}
+          <button class:active={page === item.id} on:click={() => (page = item.id)}>
+            {item.label}
+            {#if item.id === 'alarm-events' && $unackedAlarms > 0}
+              <span class="pill">{$unackedAlarms}</span>
+            {/if}
+          </button>
+        {/each}
       </nav>
       <div class="side-foot">
         <div class="who">{$user?.displayName || $user?.username}</div>
@@ -59,8 +90,12 @@
         <Mills />
       {:else if page === 'samples'}
         <ViscositySamples />
-      {:else}
+      {:else if page === 'passes'}
         <GrindPasses />
+      {:else if page === 'alarm-rules'}
+        <AlarmRules />
+      {:else}
+        <AlarmEvents />
       {/if}
     </main>
   </div>
@@ -143,6 +178,23 @@
     background: linear-gradient(90deg, rgba(139, 37, 0, 0.35), rgba(192, 57, 43, 0.12));
     border-color: rgba(231, 76, 60, 0.45);
     color: white;
+  }
+
+  .nav-group {
+    margin: 0.7rem 0.4rem 0.15rem;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    color: var(--vermillion-400);
+    text-transform: uppercase;
+  }
+
+  .pill {
+    margin-left: 0.4rem;
+    padding: 0.05rem 0.45rem;
+    font-size: 0.72rem;
+    background: var(--vermillion-700);
+    color: white;
+    border-radius: 999px;
   }
 
   .side-foot {

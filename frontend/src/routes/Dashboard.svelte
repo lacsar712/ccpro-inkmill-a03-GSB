@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '../lib/api';
+  import { unackedAlarms } from '../lib/alarms';
   import type { DashboardStats } from '../lib/types';
 
   let data: DashboardStats | null = null;
@@ -10,6 +11,7 @@
   onMount(async () => {
     try {
       data = await api<DashboardStats>('/dashboard');
+      unackedAlarms.set(data.unackedAlarms);
     } catch (e) {
       error = e instanceof Error ? e.message : '加载失败';
     } finally {
@@ -45,13 +47,17 @@
       <div class="k">近 7 日研磨遍次</div>
       <div class="v">{data.passesLast7d}</div>
     </article>
+    <article>
+      <div class="k">未确认粘度告警</div>
+      <div class="v accent">{data.unackedAlarms}</div>
+    </article>
   </div>
 {/if}
 
 <style>
   .grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 1rem;
   }
 
